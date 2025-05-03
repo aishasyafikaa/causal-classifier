@@ -1,0 +1,17 @@
+# Ignore virtual environments
+myenv/
+venv/
+.env
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# System files
+.DS_Storeresults/
+results/
+myenv/
+*.dylib

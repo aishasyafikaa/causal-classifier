@@ -1,0 +1,3 @@
+[submodule "UniCausal"]
+	path = UniCausal
+	url = git@github.com:tanfiona/UniCausal.git
