@@ -6,7 +6,7 @@ import torch
 # load and prepare dataset
 #===========================
 print("Loading train and test datasets...")
-train_df = pd.read_csv('UniCausal/data/splits/esl2_train.csv')
+train_df = pd.read_csv('UniCausal/data/splits/semeval2010t8_train.csv')
 test_df = pd.read_csv('UniCausal/data/splits/esl2_test.csv')
 
 #This codes only apply when using text only, not text with pairs
@@ -34,7 +34,7 @@ train_encodings = tokenizer(train_texts, padding=True, truncation=True, max_leng
 test_encodings = tokenizer(test_texts, padding=True, truncation=True, max_length=128)
 
 # ========================
-# Step 3: Wrap in Dataset
+# Wrap in Dataset
 # ========================
 class CausalDataset(torch.utils.data.Dataset):
     def __init__(self, encodings, labels):
@@ -53,13 +53,13 @@ train_dataset = CausalDataset(train_encodings, train_labels)
 test_dataset = CausalDataset(test_encodings, test_labels)
 
 # ========================
-# Step 4: Load Model
+# Load Model
 # ========================
 print("Loading BERT model...")
 model = BertForSequenceClassification.from_pretrained(model_name, num_labels=2)
 
 # ========================
-# Step 5: Train with Trainer
+# Train with Trainer
 # ========================
 training_args = TrainingArguments(
     output_dir="./results",
@@ -82,7 +82,7 @@ trainer = Trainer(
 )
 
 # ========================
-# Step 6: Train!
+# Step 6: Train
 # ========================
 print("Training the model...")
 trainer.train()
