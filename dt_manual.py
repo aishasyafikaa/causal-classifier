@@ -13,8 +13,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 # ========================
 # Step 1: Load Preprocessed Data
 # ========================
-train_df = pd.read_csv('UniCausal/data/splits/esl2_train.csv')
-test_df = pd.read_csv('UniCausal/data/splits/esl2_test.csv')
+train_df = pd.read_csv('UniCausal/data/splits/because_train.csv')
+test_df = pd.read_csv('UniCausal/data/splits/because_test.csv')
 
 train_df['label'] = train_df['seq_label']
 test_df['label'] = test_df['seq_label']
@@ -127,7 +127,7 @@ y_test = test_feats['label']
 # ========================
 # Step 4: Bagging + Decision Tree + Grid Search
 # ========================
-base_tree = DecisionTreeClassifier(random_state=42)
+'''base_tree = DecisionTreeClassifier(random_state=42)
 
 bagging = BaggingClassifier(estimator=base_tree, random_state=42)
 
@@ -147,9 +147,9 @@ grid_search = GridSearchCV(
     verbose=1
 )
 
-grid_search.fit(X_train_vec, y_train)
+grid_search.fit(X_train_vec, y_train)'''
 
-'''# ========================
+# ========================
 # Step 4: RandomForestt + Grid Search
 # ========================
 
@@ -171,7 +171,7 @@ grid_search = GridSearchCV(
     verbose=1
 )
 
-grid_search.fit(X_train_vec, y_train)'''
+grid_search.fit(X_train_vec, y_train)
 
 # ========================
 # Step 5: Evaluate Best Model

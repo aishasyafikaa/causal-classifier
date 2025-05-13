@@ -1,4 +1,5 @@
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments
 import torch
 
@@ -6,21 +7,49 @@ import torch
 # load and prepare dataset
 #===========================
 print("Loading train and test datasets...")
-train_df = pd.read_csv('UniCausal/data/splits/semeval2010t8_train.csv')
-test_df = pd.read_csv('UniCausal/data/splits/esl2_test.csv')
 
-#This codes only apply when using text only, not text with pairs
-#train_df = train_df[train_df["eg_id"] == 0]
-#test_df = test_df[test_df["eg_id"] == 0]
+#testing all
+from glob import glob
+train_files = glob("UniCausal/data/splits/*_train.csv")
+test_files = glob("UniCausal/data/splits/*_test.csv")
 
-train_df['label'] = train_df['pair_label']
-test_df['label'] = test_df['pair_label']
+train_df = [pd.read_csv(file) for file in train_files]
+train_df = pd.concat(train_df, ignore_index=True)
 
-train_texts = train_df['text_w_pairs'].tolist()
-test_texts = test_df['text_w_pairs'].tolist()
+test_df = [pd.read_csv(file) for file in test_files]
+test_df = pd.concat(test_df, ignore_index=True)
 
-train_labels = train_df['label'].tolist()
-test_labels = test_df['label'].tolist()
+
+'''train_df = pd.read_csv('UniCausal/data/splits/because_train.csv')
+test_df = pd.read_csv('UniCausal/data/splits/because_test.csv')
+
+print(f"Train set: {len(train_df)} rows")
+print(f"Test set: {len(test_df)} rows")'''
+
+# Deduplicate
+train_df = train_df.sort_values('eg_id').drop_duplicates(subset=['corpus', 'doc_id', 'sent_id'], keep='first')
+test_df = test_df.sort_values('eg_id').drop_duplicates(subset=['corpus', 'doc_id', 'sent_id'], keep='first')
+
+combined_df = pd.concat([train_df, test_df], ignore_index=True)
+
+combined_df['label'] = combined_df['seq_label']
+texts = combined_df['text'].tolist()
+labels = combined_df['label'].astype(int).tolist()
+
+print("Combined label distribution:")
+print(combined_df['label'].value_counts())
+
+train_texts, test_texts, train_labels, test_labels = train_test_split(
+    texts, labels, stratify=labels, test_size=0.25, random_state=42
+)
+
+from collections import Counter
+
+print("Train label distribution:")
+print(Counter(train_labels))
+
+print("Test label distribution:")
+print(Counter(test_labels))
 
 
 #=================================

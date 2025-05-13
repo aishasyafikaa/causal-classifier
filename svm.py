@@ -11,8 +11,8 @@ from sklearn.metrics import confusion_matrix, classification_report, ConfusionMa
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 # Load data
-train_df = pd.read_csv('UniCausal/data/splits/because_train.csv')
-test_df = pd.read_csv('UniCausal/data/splits/because_test.csv')
+train_df = pd.read_csv('UniCausal/data/splits/altlex_train.csv')
+test_df = pd.read_csv('UniCausal/data/splits/altlex_test.csv')
 
 train_df['label'] = train_df['seq_label']
 test_df['label'] = test_df['seq_label']
@@ -43,7 +43,7 @@ data['label'] = data['seq_label']
 
 # Stratified train/test split
 x_train, x_test, y_train, y_test = train_test_split(
-    data['text'], data['label'], stratify=data['label'], test_size=0.25, random_state=42
+    data['text_w_pairs'], data['label'], stratify=data['label'], test_size=0.25, random_state=42
 )
 
 # Check label balance
@@ -113,8 +113,8 @@ for kernel in kernels:
     plt.title(f"SVM Confusion Matrix ({kernel} kernel)")
     plt.show()'''
 
-# PCA for visualization
-# ================================
+
+''''# ================================
 # PCA for Visualisation
 # ================================
 
@@ -187,4 +187,4 @@ legend.get_texts()[1].set_text("Causal")
 ax.set_xlabel("PC1")
 ax.set_ylabel("PC2")
 ax.set_title("SVM Decision Surface (PCA-transformed TF-IDF, Because)")
-plt.show()
+plt.show()'''

@@ -19,8 +19,8 @@ nlp = spacy.load('en_core_web_sm')
 # Step 1: Load Data
 # ========================
 # Load data
-train_df = pd.read_csv('UniCausal/data/splits/altlex_train.csv')
-test_df = pd.read_csv('UniCausal/data/splits/altlex_test.csv')
+train_df = pd.read_csv('UniCausal/data/splits/because_train.csv')
+test_df = pd.read_csv('UniCausal/data/splits/because_test.csv')
 train_df['label'] = train_df['seq_label']
 test_df['label'] = test_df['seq_label']
 
@@ -116,7 +116,7 @@ train_feats_df['label'] = y_train.values
 test_feats_df['label'] = y_test.values
 
 # ========================
-# Step 3: Prepare Manual Features
+# Prepare Manual Features
 # ========================
 train_feats_df = pd.get_dummies(train_feats_df, columns=[
     'relator', 'relator_modifier', 'cause_verb_sem_class', 'effect_verb_sem_class'])
@@ -134,24 +134,24 @@ y_train = train_feats_df['label']
 y_test = test_feats_df['label']
 
 # ========================
-# Step 4: TF-IDF
+# TF-IDF
 # ========================
 X_train_lower = X_train_text.str.lower()
 X_test_lower = X_test_text.str.lower()
 
-vectorizer = TfidfVectorizer(ngram_range=(1, 3), max_features=5000)
+vectorizer = TfidfVectorizer(ngram_range=(1, 3), max_features=5000, stop_words='english')
 X_train_tfidf = vectorizer.fit_transform(X_train_lower)
 X_test_tfidf = vectorizer.transform(X_test_lower)
 
 
 # ========================
-# Step 5: Combine Features
+# Combine Features
 # ========================
 X_train_combined = hstack([X_train_tfidf, csr_matrix(X_train_manual.values)])
 X_test_combined = hstack([X_test_tfidf, csr_matrix(X_test_manual.values)])
 
 # ========================
-# Step 6: Train RandomForest + Evaluate
+# Train RandomForest + Evaluate
 # ========================
 clf = RandomForestClassifier(
     n_estimators=50,
@@ -165,7 +165,7 @@ print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
 print("\nClassification Report:\n", classification_report(y_test, y_pred, digits=2))
 
 # ========================
-# Step 7: Feature Importance
+#Feature Importance
 # ========================
 tfidf_feature_names = vectorizer.get_feature_names_out()
 manual_feature_names = X_train_manual.columns

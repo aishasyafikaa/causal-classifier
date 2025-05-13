@@ -1,89 +1,136 @@
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import classification_report, confusion_matrix
 
-from UniCausal._datasets.unifiedcre import load_cre_dataset
-from sklearn.feature_extraction import DictVectorizer
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.metrics import classification_report
-import matplotlib.pyplot as plt
-from collections import Counter
-import nltk
-from nltk import word_tokenize
-
-nltk.download('punkt_tab')
-nltk.download('averaged_perceptron_tagger_eng')
-
-def extract_features(sentence: str):
-    sentence = sentence.lower()
-    tokens = word_tokenize(sentence)
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import BaggingClassifier
 
 
-    relators = ['because', 'since', 'after', 'as', 'cause', 'lead', 'make', 'result', 'bring']
-    features = {}
+def load_data(train_path, test_path, label_type='pair_label', deduplicate=False):
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
 
-    # Relator presence and position
-    for word in relators:
-        features[f"has_{word}"] = int(word in tokens)
-        features[f"{word}_at_start"] = int(tokens[0] == word)
+    train_df['label'] = train_df[label_type]
+    test_df['label'] = test_df[label_type]
 
-    # Length and punctuation
-    features["length"] = len(tokens)
-    features["punctuation_count"] = sum(1 for c in sentence if c in '.,;!?')
+    if deduplicate:
+        train_df = train_df.sort_values('eg_id').drop_duplicates(subset=['corpus', 'doc_id', 'sent_id'], keep='first')
+        test_df = test_df.sort_values('eg_id').drop_duplicates(subset=['corpus', 'doc_id', 'sent_id'], keep='first')
 
-    return features
+    data = pd.concat([train_df, test_df], ignore_index=True)
+    return data
 
-def main():
-    print("Loading datasets: altlex, because, ctb, semeval2010t8")
-    span_data, seqpair_data, stats = load_cre_dataset(
-        dataset_name=['altlex', 'because', 'ctb', 'semeval2010t8'],
-        do_train_val=True,
-        data_dir='UniCausal/data'
+
+def prepare_data(data, ngram_range=(1, 3)):
+    X_train, X_test, y_train, y_test = train_test_split(
+        data['text'], data['label'], stratify=data['label'], test_size=0.25, random_state=42
     )
-    #print("Available keys in seqpair_data:", seqpair_data.keys())
 
-    #prepare training and validation data
-    target_corpora = ['altlex', 'because', 'ctb', 'semeval2010t8']
-    train_data = [ex for ex in seqpair_data['seq_train'] if ex['corpus'] in target_corpora]
-    val_data = [ex for ex in seqpair_data['seq_validation'] if ex['corpus'] in target_corpora]
+    vectorizer = TfidfVectorizer(ngram_range=ngram_range)
+    X_train_vec = vectorizer.fit_transform(X_train)
+    X_test_vec = vectorizer.transform(X_test)
 
-    #check how many examples available in datasets
-    print(f"Train examples: {len(train_data)}")
-    print(f"Validation examples: {len(val_data)}")
-    print("Train label distribution:", Counter([ex['label'] for ex in train_data]))
-    print("Validation label distribution:", Counter([ex['label'] for ex in val_data]))
+    return X_train_vec, X_test_vec, y_train, y_test
 
-    print("Extracting features...")
-    X_train = [extract_features(ex['text']) for ex in train_data]
-    y_train = [ex['label'] for ex in train_data]
 
-    X_test = [extract_features(ex['text']) for ex in val_data]
-    y_test = [ex['label'] for ex in val_data]
+def evaluate_model(model, X_test, y_test):
+    y_pred = model.predict(X_test)
+    print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+    print("\nClassification Report:\n", classification_report(y_test, y_pred, digits=2))
 
-    print("Vectorizing features...")
-    vec = DictVectorizer(sparse=False)
-    X_train_vec = vec.fit_transform(X_train)
-    X_test_vec = vec.transform(X_test)
 
-    print("Training Decision Tree...")
-    clf = DecisionTreeClassifier(
-        max_depth=10,
-        min_samples_split=10,
-        min_samples_leaf=5,
-        max_features='sqrt',
-        class_weight='balanced',
-        criterion='entropy',
-        random_state=42
+def run_logistic_regression(X_train, X_test, y_train, y_test):
+    lr = LogisticRegression(
+        C=1.0, max_iter=1000, random_state=42, class_weight='balanced',
+        solver='liblinear', penalty='l2'
     )
-    clf.fit(X_train_vec, y_train)
+    lr.fit(X_train, y_train)
+    print("Logistic Regression Results:")
+    evaluate_model(lr, X_test, y_test)
 
-    print("Evaluation:")
-    y_pred = clf.predict(X_test_vec)
-    print(classification_report(y_test, y_pred))
 
-    print("Visualizing decision tree...")
-    plt.figure(figsize=(20, 10))
-    plot_tree(clf, feature_names=vec.get_feature_names_out(), class_names=["non-causal", "causal"], filled=True, rounded=True)
-    plt.title("Decision Tree for Causal Sentence Classification (open-access datasets)")
-    plt.savefig("decision_tree_visualization.png")
-    plt.show()
+def run_svm(X_train, X_test, y_train, y_test):
+    param_grid = {
+        'C': [0.5, 1, 10],
+        'kernel': ['linear', 'rbf'],
+        'gamma': ['scale', 'auto']
+    }
 
-if __name__ == "__main__":
-    main()
+    grid = GridSearchCV(SVC(class_weight='balanced'), param_grid, cv=5, scoring='f1_macro', verbose=0)
+    grid.fit(X_train, y_train)
+    print("SVM Results:")
+    print("Best Parameters:", grid.best_params_)
+    evaluate_model(grid.best_estimator_, X_test, y_test)
+
+
+def run_decision_tree_bagging(X_train, X_test, y_train, y_test):
+    base_tree = DecisionTreeClassifier(random_state=42)
+    bagging = BaggingClassifier(estimator=base_tree, random_state=42)
+
+    param_grid = {
+        'n_estimators': [50, 100],
+        'estimator__max_depth': [None, 10],
+        'estimator__min_samples_split': [2, 5],
+        'estimator__max_features': ['sqrt', 'log2']
+    }
+
+    grid_search = GridSearchCV(bagging, param_grid, cv=5, scoring='f1_macro', n_jobs=-1, verbose=1)
+    grid_search.fit(X_train, y_train)
+    print("Decision Tree + Bagging Results:")
+    print("Best Parameters:", grid_search.best_params_)
+    evaluate_model(grid_search.best_estimator_, X_test, y_test)
+
+def run_random_forest(X_train, X_test, y_train, y_test):
+    from sklearn.ensemble import RandomForestClassifier
+
+    rf = RandomForestClassifier(random_state=42, class_weight='balanced')
+
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20],
+        'min_samples_split': [2, 5],
+        'max_features': ['sqrt', 'log2', None]
+    }
+
+    grid_search = GridSearchCV(
+        estimator=rf,
+        param_grid=param_grid,
+        cv=5,
+        scoring='f1_macro',
+        n_jobs=-1,
+        verbose=1
+    )
+
+    grid_search.fit(X_train, y_train)
+
+    print("Random Forest Results:")
+    print("Best Parameters:", grid_search.best_params_)
+    print(f"Best F1 Score (CV): {grid_search.best_score_:.4f}")
+
+    best_model = grid_search.best_estimator_
+    evaluate_model(best_model, X_test, y_test)
+
+
+
+# =========================
+# ===== Main Runner =======
+# =========================
+
+if __name__ == '__main__':
+    # Change these to the dataset you want to use
+    train_path = 'UniCausal/data/splits/altlex_train.csv'
+    test_path = 'UniCausal/data/splits/altlex_test.csv'
+    label_type = 'seq_label'  # or 'seq_label'
+    deduplicate = True
+
+    data = load_data(train_path, test_path, label_type, deduplicate)
+    X_train, X_test, y_train, y_test = prepare_data(data)
+
+    # Call the model(s) you want to run:
+    run_logistic_regression(X_train, X_test, y_train, y_test)
+    run_svm(X_train, X_test, y_train, y_test)
+    run_decision_tree_bagging(X_train, X_test, y_train, y_test)
+    run_random_forest(X_train, X_test, y_train, y_test)
